@@ -27,13 +27,21 @@ def getTokenUrlopen(html):
     return token
 
 # Get the token by Requests(module), return the token.
-def getTokenRequests(session):
-     response = session.get('https://hinative.com/en-US/users/sign_in')
+def getTokenRequests(session,url):
+     response = session.get(url)
      bsobj = BeautifulSoup(response.text,"html.parser")
      token = bsobj.find("meta",{"name":"csrf-token"})['content']
      print("Your token is: %s" %token)
      return token
 
+# Get a token for asking question. (Asking question do need another token!)
+def getAskTokenRequests(session,url):
+     response = session.get(url)
+     bsobj = BeautifulSoup(response.text,"html.parser")
+     token = bsobj.find("input",{"name":"authenticity_token"})['value']
+     print("Your token is: %s" %token)
+     return token
+ 
 # Get the user's ID from "setting" page, need a Requests session as argument. 
 def getUserID(session):
     response = session.get('https://hinative.com/en-US/setting')
@@ -42,13 +50,17 @@ def getUserID(session):
     print("Your userID at \"HiNative.com\" is:"+userID)
     return userID
 
-# Open a Requests session
+# 0.Prepare the URL will be used
+loginUrl = 'https://hinative.com/en-US/users/sign_in'
+askQuestionUrl = 'https://hinative.com/en-US/questions/type'
+
+# 1.Open a Requests session
 session = requests.Session()
 
-# Grab the token from response
-token=getTokenRequests(session)
+# 2.Grab the token from response(for login)
+token=getTokenRequests(session,loginUrl)
 
-# Post the username, password and token to login
+# 3.Post the username, password and token to login
 username = raw_input('Your username: ')
 password = raw_input('Your password: ')
 params={'user[login]':username,'user[password]':password\
@@ -58,7 +70,20 @@ params={'user[login]':username,'user[password]':password\
 loginPage = session.post('https://hinative.com/en-US/users/sign_in',params=params)
 print("You are logged in!")
 
-# Go to ask a question!
-questionType = session.get('https://hinative.com/en-US/questions/type')
-print(questionType.text)
-bsobj = BeautifulSoup(questionType.text,"html.parser")
+# 4.Go to ask a question!
+
+# Asking question need another token
+token = getAskTokenRequests(session,'https://hinative.com/en-US/questions/new?type=WhatsayQuestion')
+
+# 5.Although on Web you need to access 'https://hinative.com/en-US/questions/type' to select a type,
+# the ultimate destination of that is, however, 'https://hinative.com/en-US/questions'.
+questionContent = raw_input('Your question is: How do you say this in Japanese?')
+params={'authenticity_token':token,'type':'WhatsayQuestion','question[language_id]':45,\
+        'question[question_keywords_attributes][0][name]':questionContent,\
+        'commit':'Sending','question[prior]':0}
+askWhatsay=session.post('https://hinative.com/en-US/questions',params=params)
+
+# 6.From the response, find the question ID for later reuse
+bsobj = BeautifulSoup(askWhatsay.text,"html.parser")
+questionID = bsobj.find("div",{"class":"box_content"})['ng_init']
+print('Your question id is:%s'%questionID)
