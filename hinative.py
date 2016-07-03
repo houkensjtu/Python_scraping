@@ -50,6 +50,34 @@ def getUserID(session):
     print("Your userID at \"HiNative.com\" is:"+userID)
     return userID
 
+def askQuestion(session):
+    # Language id list:
+    # Japanese: 45
+    # German: 32
+    # Simplified Chinese: 82
+    # English (US): 22
+    # English (UK): 21
+    languageList = {'1':22,'2':21,'3':32,'4':45,'5':82}
+    languageChoice = raw_input('About which language do you want to ask? 1:US 2:UK 3:DE 4:JP 5:ZH')
+
+    # Question type:
+    # How do you say this? -> WhatsayQuestion
+    # Does this sound natural? -> ChoiceQuestion
+    # Please show me example sentences with ~ -> ExampleQuestion
+    # What does ~ mean? -> MeaningQuestion
+    # What is the difference between ~? -> DifferenceQuestion
+    # Ask something else. -> FreeQuestion
+    # Ask a question about a country. -> CountryQuestion
+    questionList = {'1':'WhatsayQuestion', '2':'ChoiceQuestion','3':'ExampleQuestion',\
+                    '4':'MeaningQuestion','5':'DifferenceQuestion','6':'FreeQuestion'}
+    questionChoice = raw_input('Which kind of question do you want to ask?')
+    questionContent = raw_input('Your question is: How do you say this in %s?'%languageChoice)
+    params={'authenticity_token':token,'type':questionList[questionChoice],\
+            'question[language_id]':languageList[languageChoice],\
+            'question[question_keywords_attributes][0][name]':questionContent,\
+            'commit':'Sending','question[prior]':0}
+    return session.post('https://hinative.com/en-US/questions',params=params)
+
 # 0.Prepare the URL will be used
 loginUrl = 'https://hinative.com/en-US/users/sign_in'
 askQuestionUrl = 'https://hinative.com/en-US/questions/type'
@@ -77,13 +105,10 @@ token = getAskTokenRequests(session,'https://hinative.com/en-US/questions/new?ty
 
 # 5.Although on Web you need to access 'https://hinative.com/en-US/questions/type' to select a type,
 # the ultimate destination of that is, however, 'https://hinative.com/en-US/questions'.
-questionContent = raw_input('Your question is: How do you say this in Japanese?')
-params={'authenticity_token':token,'type':'WhatsayQuestion','question[language_id]':45,\
-        'question[question_keywords_attributes][0][name]':questionContent,\
-        'commit':'Sending','question[prior]':0}
-askWhatsay=session.post('https://hinative.com/en-US/questions',params=params)
+
+questionResult = askQuestion(session)
 
 # 6.From the response, find the question ID for later reuse
-bsobj = BeautifulSoup(askWhatsay.text,"html.parser")
+bsobj = BeautifulSoup(questionResult.text,"html.parser")
 questionID = bsobj.find("div",{"class":"box_content"})['ng_init']
 print('Your question id is:%s'%questionID)
