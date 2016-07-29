@@ -3,6 +3,9 @@ from urllib2 import URLError
 from bs4 import BeautifulSoup
 from time import sleep
 import requests
+import re
+import json
+import pdb
 
 # proxies will only be necessary when you are behind an evil firewall...
 proxies = {'http':'http://ch40203515%40shi-g.com:2N%21n9Ly%24\
@@ -50,7 +53,7 @@ def getUserID(session):
     print("Your userID at \"HiNative.com\" is:"+userID)
     return userID
 
-def askQuestion(session):
+def askQuestion(session,token):
     # Language id list:
     # Japanese: 45
     # German: 32
@@ -76,6 +79,7 @@ def askQuestion(session):
             'question[language_id]':languageList[languageChoice],\
             'question[question_keywords_attributes][0][name]':questionContent,\
             'commit':'Sending','question[prior]':0}
+    
     return session.post('https://hinative.com/en-US/questions',params=params)
 
 # 0.Prepare the URL will be used
@@ -86,11 +90,19 @@ askQuestionUrl = 'https://hinative.com/en-US/questions/type'
 session = requests.Session()
 
 # 2.Grab the token from response(for login)
-token=getTokenRequests(session,loginUrl)
+token = getTokenRequests(session,loginUrl)
 
-# 3.Post the username, password and token to login
-username = raw_input('Your username: ')
-password = raw_input('Your password: ')
+# 3.Find user information from a json file.
+
+#username = raw_input('Your username: ')
+#password = raw_input('Your password: ')
+
+user_info_file = open('user_info.json','r')
+data = json.load(user_info_file)
+username = data[0]['username']
+password = data[0]['password']
+user_info_file.close()
+
 params={'user[login]':username,'user[password]':password\
         ,'authenticity_token':token,'user[remember_me]':0,\
         'user[remember_me]':1,'commit':'Sign in'}
@@ -106,9 +118,25 @@ token = getAskTokenRequests(session,'https://hinative.com/en-US/questions/new?ty
 # 5.Although on Web you need to access 'https://hinative.com/en-US/questions/type' to select a type,
 # the ultimate destination of that is, however, 'https://hinative.com/en-US/questions'.
 
-questionResult = askQuestion(session)
+questionResult = askQuestion(session,token)
 
 # 6.From the response, find the question ID for later reuse
 bsobj = BeautifulSoup(questionResult.text,"html.parser")
-questionID = bsobj.find("div",{"class":"box_content"})['ng_init']
+
+# Find the line questionID is in.
+questionID_line = bsobj.find("div",{"class":"box_content"})['ng_init']
+
+questionID = re.findall("bookmarkable_id='(.*?)'", questionID_line)[0]
+
 print('Your question id is:%s'%questionID)
+
+data = {}
+data['questionID'] = questionID
+data['questionContent'] = bsobj.find("title").text
+data['questionAnswer'] = ''
+
+with open('question_log.json', 'w') as outfile:
+    json.dump(data, outfile)
+outfile.close()
+
+print('Victory!!')
